@@ -5,9 +5,7 @@ import 'hardhat/console.sol';
 import './ExampleExternalContract.sol';
 
 error DeadlineExceeded(uint256 deadline, uint256 time);
-error DeadlineNotReached(uint256 deadline, uint256 time);
-error ThresholdNotReached(uint256 threshold, uint256 balance);
-error ThresholdMet(uint256 threshold, uint256 balance);
+error DeadlineNotReached(uint256 timeLeft);
 error NotOpenForWithdraw();
 error NothingToWithdraw(address sender, uint256 balance);
 error StakeHasBeenCompleted();
@@ -19,7 +17,7 @@ contract Staker {
 
   mapping(address => uint256) public balances;
   uint256 public constant threshold = 1 ether;
-  uint256 public immutable deadline = block.timestamp + 30 seconds;
+  uint256 public immutable deadline = block.timestamp + 30 minutes;
   bool public openForWithdraw = false;
 
   event Stake(address indexed staker, uint256 amount);
@@ -40,7 +38,7 @@ contract Staker {
 
   modifier deadlineReached() {
     if (block.timestamp < deadline) {
-      revert DeadlineNotReached(deadline, block.timestamp);
+      revert DeadlineNotReached(timeLeft());
     }
     _;
   }
@@ -92,7 +90,7 @@ contract Staker {
   /// @notice If the current block timestamp is greater than or equal to the deadline, it returns 0.
   ///         Otherwise, it returns the remaining time in seconds.
   /// @return The time left until the deadline in seconds as a uint256 value.
-  function timeLeft() external view returns (uint256) {
+  function timeLeft() public view returns (uint256) {
     return block.timestamp >= deadline ? 0 : deadline - block.timestamp;
   }
 
