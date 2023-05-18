@@ -5,7 +5,7 @@ import 'hardhat/console.sol';
 import './ExampleExternalContract.sol';
 
 error DeadlineExceeded(uint256 deadline, uint256 time);
-error DeadlineNotReached(uint256 timeLeft);
+error DeadlineNotReached(uint256 secondsLeft);
 error NotOpenForWithdraw();
 error NothingToWithdraw(address sender, uint256 balance);
 error StakeHasBeenCompleted();
