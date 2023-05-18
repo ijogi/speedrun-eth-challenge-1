@@ -4,20 +4,23 @@ pragma solidity >=0.8.0 <0.9.0;
 import 'hardhat/console.sol';
 import './ExampleExternalContract.sol';
 
+error NoStakeIncluded();
 error DeadlineExceeded(uint256 deadline, uint256 time);
 error DeadlineNotReached(uint256 secondsLeft);
-error NotOpenForWithdraw();
+error NotOpenForWithdrawals();
 error NothingToWithdraw(address sender, uint256 balance);
+error WithdrawalFailed();
 error StakeHasBeenCompleted();
+error ExternalContractCallFailed();
 
-/// @title Staker
+/// @title Staker smart contract
 /// @dev A smart contract for staking ether and executing an external contract if the threshold is reached.
 contract Staker {
   ExampleExternalContract public exampleExternalContract;
 
   mapping(address => uint256) public balances;
   uint256 public constant threshold = 1 ether;
-  uint256 public immutable deadline = block.timestamp + 30 minutes;
+  uint256 public immutable deadline = block.timestamp + 30 seconds;
   bool public openForWithdraw = false;
 
   event Stake(address indexed staker, uint256 amount);
@@ -25,13 +28,6 @@ contract Staker {
   modifier stakeNotCompleted() {
     if (exampleExternalContract.completed()) {
       revert StakeHasBeenCompleted();
-    }
-    _;
-  }
-
-  modifier deadlineNotExceeded() {
-    if (block.timestamp >= deadline) {
-      revert DeadlineExceeded(deadline, block.timestamp);
     }
     _;
   }
@@ -49,20 +45,38 @@ contract Staker {
     exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
   }
 
-  /// @notice Allows users to stake ether by sending it to the contract.
-  /// @dev Stakes ether sent by the user and emits a Stake event.
-  function stake() public payable deadlineNotExceeded stakeNotCompleted {
-    balances[msg.sender] = msg.value;
-    emit Stake(msg.sender, msg.value);
+  /// @notice Allows a user to stake Ether by sending it to the contract.
+  /// @dev Increments the user's balance by the amount of Ether sent with the transaction.
+  ///      Emits a Stake event upon successful staking.
+  ///      Reverts if the deadline has passed or if no Ether is sent with the transaction.
+  ///      This function can only be called if the stake has not been completed.
+  function stake() public payable stakeNotCompleted {
+    uint256 amount = msg.value;
+
+    if (amount == 0) {
+      revert NoStakeIncluded();
+    }
+    if (block.timestamp >= deadline) {
+      revert DeadlineExceeded(deadline, block.timestamp);
+    }
+
+    balances[msg.sender] += amount;
+    emit Stake(msg.sender, amount);
   }
 
   /// @notice Executes the external contract if the threshold is reached, otherwise, allows users to withdraw their stake.
   /// @dev Sets the openForWithdraw flag if the threshold is not reached, otherwise calls the external contract's complete function.
   function execute() external deadlineReached stakeNotCompleted {
-    if (address(this).balance < threshold) {
+    uint256 contractBalance = address(this).balance;
+
+    if (contractBalance < threshold) {
       openForWithdraw = true;
     } else {
-      exampleExternalContract.complete{value: address(this).balance}();
+      try exampleExternalContract.complete{value: contractBalance}() {
+        // External call succeeded
+      } catch {
+        revert ExternalContractCallFailed();
+      }
     }
   }
 
@@ -72,18 +86,20 @@ contract Staker {
   ///         Upon a successful withdrawal, the user's balance is set to 0.
   function withdraw() external deadlineReached stakeNotCompleted {
     uint256 amount = balances[msg.sender];
-    if (!openForWithdraw) {
-      revert NotOpenForWithdraw();
-    }
 
-    if (balances[msg.sender] == 0) {
+    if (amount == 0) {
       revert NothingToWithdraw(msg.sender, amount);
+    }
+    if (!openForWithdraw) {
+      revert NotOpenForWithdrawals();
     }
 
     balances[msg.sender] = 0;
 
     (bool success, ) = msg.sender.call{value: amount}('');
-    require(success, 'Wihtdrawal failed.');
+    if (!success) {
+      revert WithdrawalFailed();
+    }
   }
 
   /// @dev Calculates the time left until the deadline.
