@@ -24,11 +24,16 @@ contract Staker {
   bool public openForWithdraw;
   bool private isCompleted;
 
+  /// @notice Emitted when a user stakes Ether
   event Stake(address indexed staker, uint256 amount);
+  /// @notice Emitted when the stake has been completed
   event StakeCompleted();
+  /// @notice Emitted when the contract is open for withdrawals
   event OpenForWithdrawals();
+  /// @notice Emitted when a user completes a withdrawal
   event WithrawalCompleted(address indexed staker, uint256 amount);
 
+  /// @dev Modifier to check if the stake has not been completed
   modifier stakeNotCompleted() {
     if (isCompleted) {
       revert StakeHasBeenCompleted();
@@ -36,6 +41,7 @@ contract Staker {
     _;
   }
 
+  /// @dev Modifier to check if the deadline has been reached
   modifier deadlineReached() {
     if (block.timestamp < deadline) {
       revert DeadlineNotReached(timeLeft());
@@ -43,7 +49,7 @@ contract Staker {
     _;
   }
 
-  /// @dev Initializes the contract with an address of the ExampleExternalContract.
+  /// @notice Initializes the contract with an address of the ExampleExternalContract.
   /// @param exampleExternalContractAddress The address of the ExampleExternalContract.
   constructor(address exampleExternalContractAddress) {
     exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
@@ -52,8 +58,6 @@ contract Staker {
   /// @notice Allows a user to stake Ether by sending it to the contract.
   /// @dev Increments the user's balance by the amount of Ether sent with the transaction.
   ///      Emits a Stake event upon successful staking.
-  ///      Reverts if the deadline has passed or if no Ether is sent with the transaction.
-  ///      This function can only be called if the stake has not been completed.
   function stake() public payable stakeNotCompleted {
     uint256 amount = msg.value;
 
@@ -89,10 +93,9 @@ contract Staker {
     }
   }
 
-  /// @dev Allows users to withdraw their balances if the conditions are met.
-  /// @notice This function can only be called after the deadline has passed and the contract balance is below the threshold.
-  ///         It reverts with appropriate error messages if any of these conditions are not met or if the user has no balance to withdraw.
-  ///         Upon a successful withdrawal, the user's balance is set to 0.
+  /// @notice Allows users to withdraw their balances if the conditions are met.
+  /// @dev This function can only be called after the deadline has passed and the contract balance is below the threshold.
+  ///      Upon a successful withdrawal, the user's balance is set to 0.
   function withdraw() external deadlineReached stakeNotCompleted {
     address sender = msg.sender;
     uint256 amount = balances[sender];
@@ -114,9 +117,9 @@ contract Staker {
     }
   }
 
-  /// @dev Calculates the time left until the deadline.
-  /// @notice If the current block timestamp is greater than or equal to the deadline, it returns 0.
-  ///         Otherwise, it returns the remaining time in seconds.
+  /// @notice Calculates the time left until the deadline.
+  /// @dev If the current block timestamp is greater than or equal to the deadline, it returns 0.
+  ///      Otherwise, it returns the remaining time in seconds.
   /// @return The time left until the deadline in seconds as a uint256 value.
   function timeLeft() public view returns (uint256) {
     return block.timestamp >= deadline ? 0 : deadline - block.timestamp;
