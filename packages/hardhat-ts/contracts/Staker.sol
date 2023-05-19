@@ -7,7 +7,7 @@ import './ExampleExternalContract.sol';
 error NoStakeIncluded();
 error DeadlineExceeded(uint256 deadline, uint256 time);
 error DeadlineNotReached(uint256 secondsLeft);
-error NotOpenForWithdrawals();
+error NotOpenForWithdrawalsCallExecute();
 error NothingToWithdraw(address sender, uint256 balance);
 error WithdrawalFailed();
 error StakeHasBeenCompleted();
@@ -104,7 +104,7 @@ contract Staker {
       revert NothingToWithdraw(sender, amount);
     }
     if (!openForWithdraw) {
-      revert NotOpenForWithdrawals();
+      revert NotOpenForWithdrawalsCallExecute();
     }
 
     balances[sender] = 0;
