@@ -21,12 +21,16 @@ contract Staker {
   mapping(address => uint256) public balances;
   uint256 public constant threshold = 1 ether;
   uint256 public immutable deadline = block.timestamp + 30 seconds;
-  bool public openForWithdraw = false;
+  bool public openForWithdraw;
+  bool private isCompleted;
 
   event Stake(address indexed staker, uint256 amount);
+  event StakeCompleted();
+  event OpenForWithdrawals();
+  event WithrawalCompleted(address indexed staker, uint256 amount);
 
   modifier stakeNotCompleted() {
-    if (exampleExternalContract.completed()) {
+    if (isCompleted) {
       revert StakeHasBeenCompleted();
     }
     _;
@@ -66,14 +70,19 @@ contract Staker {
 
   /// @notice Executes the external contract if the threshold is reached, otherwise, allows users to withdraw their stake.
   /// @dev Sets the openForWithdraw flag if the threshold is not reached, otherwise calls the external contract's complete function.
-  function execute() external deadlineReached stakeNotCompleted {
+  function execute() external stakeNotCompleted deadlineReached {
     uint256 contractBalance = address(this).balance;
 
     if (contractBalance < threshold) {
       openForWithdraw = true;
+      emit OpenForWithdrawals();
     } else {
       try exampleExternalContract.complete{value: contractBalance}() {
-        // External call succeeded
+        isCompleted = exampleExternalContract.completed();
+
+        if (isCompleted) {
+          emit StakeCompleted();
+        }
       } catch {
         revert ExternalContractCallFailed();
       }
@@ -85,20 +94,23 @@ contract Staker {
   ///         It reverts with appropriate error messages if any of these conditions are not met or if the user has no balance to withdraw.
   ///         Upon a successful withdrawal, the user's balance is set to 0.
   function withdraw() external deadlineReached stakeNotCompleted {
-    uint256 amount = balances[msg.sender];
+    address sender = msg.sender;
+    uint256 amount = balances[sender];
 
     if (amount == 0) {
-      revert NothingToWithdraw(msg.sender, amount);
+      revert NothingToWithdraw(sender, amount);
     }
     if (!openForWithdraw) {
       revert NotOpenForWithdrawals();
     }
 
-    balances[msg.sender] = 0;
+    balances[sender] = 0;
 
-    (bool success, ) = msg.sender.call{value: amount}('');
+    (bool success, ) = sender.call{value: amount}('');
     if (!success) {
       revert WithdrawalFailed();
+    } else {
+      emit WithrawalCompleted(sender, amount);
     }
   }
 
