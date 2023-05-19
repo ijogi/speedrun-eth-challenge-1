@@ -20,7 +20,7 @@ contract Staker {
 
   mapping(address => uint256) public balances;
   uint256 public constant threshold = 1 ether;
-  uint256 public immutable deadline = block.timestamp + 30 seconds;
+  uint256 public immutable deadline = block.timestamp + 2 minutes;
   bool public openForWithdraw;
   bool private isCompleted;
 
@@ -34,7 +34,7 @@ contract Staker {
   event WithrawalCompleted(address indexed staker, uint256 amount);
 
   /// @dev Modifier to check if the stake has not been completed
-  modifier stakeNotCompleted() {
+  modifier notCompleted() {
     if (isCompleted) {
       revert StakeHasBeenCompleted();
     }
@@ -58,7 +58,7 @@ contract Staker {
   /// @notice Allows a user to stake Ether by sending it to the contract.
   /// @dev Increments the user's balance by the amount of Ether sent with the transaction.
   ///      Emits a Stake event upon successful staking.
-  function stake() public payable stakeNotCompleted {
+  function stake() public payable {
     uint256 amount = msg.value;
 
     if (amount == 0) {
@@ -74,7 +74,7 @@ contract Staker {
 
   /// @notice Executes the external contract if the threshold is reached, otherwise, allows users to withdraw their stake.
   /// @dev Sets the openForWithdraw flag if the threshold is not reached, otherwise calls the external contract's complete function.
-  function execute() external stakeNotCompleted deadlineReached {
+  function execute() external notCompleted deadlineReached {
     uint256 contractBalance = address(this).balance;
 
     if (contractBalance < threshold) {
@@ -96,7 +96,7 @@ contract Staker {
   /// @notice Allows users to withdraw their balances if the conditions are met.
   /// @dev This function can only be called after the deadline has passed and the contract balance is below the threshold.
   ///      Upon a successful withdrawal, the user's balance is set to 0.
-  function withdraw() external deadlineReached stakeNotCompleted {
+  function withdraw() external deadlineReached notCompleted {
     address sender = msg.sender;
     uint256 amount = balances[sender];
 
